@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
+import emailjs from "@emailjs/browser";
 
 const ADMIN_PASSWORD = "samnafuzbalmepust";
 
@@ -63,6 +64,24 @@ function BookingPage() {
     ]);
 
     if (!error) {
+      try {
+        await emailjs.send(
+          "service_sn751ao",
+          "template_bogoccg",
+          {
+            customer_name: name,
+            phone: phone,
+            appointment_date: selectedDate,
+            appointment_time: selectedTime
+          },
+          "2hPd-4EsO_MkOniVS"
+        );
+
+        console.log("Email poslan.");
+      } catch (err) {
+        console.error("Napaka pri pošiljanju emaila:", err);
+      }
+
       setMessage("Termin je uspešno rezerviran.");
       setSelectedTime("");
       setName("");
