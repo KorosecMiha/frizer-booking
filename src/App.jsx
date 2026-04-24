@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import emailjs from "@emailjs/browser";
 
-const ADMIN_PASSWORD = "samnafuzbalmepust";
+
 
 const hours = [
   "08:00", "09:00", "10:00", "11:00",
@@ -104,7 +104,7 @@ const { data: existingReservations } = await supabase
   .gte("appointment_date", today);
 
 if (existingReservations && existingReservations.length > 0) {
-  setMessage("S tem imenom že imate aktivno rezervacijo.");
+  setMessage("S to telefonsko številko že imate aktivno rezervacijo.");
   return;
 }
 
@@ -429,6 +429,10 @@ function AdminPanel({ onLogout }) {
     (item) => item.status === "blocked"
   );
 
+  const todaysAppointments = appointments.filter(
+  (item) => item.appointment_date === today && item.status === "booked"
+);
+
   return (
     <div style={backgroundStyle}>
       <div style={adminCardStyle}>
@@ -442,7 +446,35 @@ function AdminPanel({ onLogout }) {
             Odjava
           </button>
         </div>
+                  <div style={blockBoxStyle}>
+          <h2 style={{ marginTop: 0 }}>Današnji termini</h2>
 
+          {todaysAppointments.length === 0 && <p>Danes ni rezervacij.</p>}
+
+          {todaysAppointments.map((appointment) => (
+            <div key={appointment.id} style={appointmentCardStyle}>
+              <div>
+                <strong>{appointment.appointment_time}</strong>
+
+                <p style={{ margin: "6px 0" }}>
+                  <strong>{appointment.customer_name}</strong>
+                </p>
+
+                <p style={{ margin: "4px 0", color: "#374151" }}>
+                  Telefon: {appointment.phone}
+                </p>
+
+                <p style={{ margin: "4px 0", color: "#374151" }}>
+                  Storitev: {appointment.service || "-"}
+                </p>
+
+                <p style={{ margin: "4px 0", color: "#6b7280" }}>
+                  Opomba: {appointment.note || "-"}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
         <div style={blockBoxStyle}>
           <h2 style={{ marginTop: 0 }}>Blokiraj termin</h2>
 
