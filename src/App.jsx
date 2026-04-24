@@ -99,7 +99,7 @@ if (!isValidPhone(phone)) {
 const { data: existingReservations } = await supabase
   .from("appointments")
   .select("id")
-  .eq("customer_name", normalizedName)
+  .eq("phone", phone.trim())
   .eq("status", "booked")
   .gte("appointment_date", today);
 
