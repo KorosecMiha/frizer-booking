@@ -22,6 +22,9 @@ export default function App() {
 }
 
 function getToday() {
+  function generateCancelCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
   return new Date().toISOString().split("T")[0];
 }
 
@@ -107,7 +110,7 @@ if (existingReservations && existingReservations.length > 0) {
   setMessage("S to telefonsko številko že imate aktivno rezervacijo.");
   return;
 }
-
+const cancelCode = generateCancelCode();
     const { error } = await supabase.from("appointments").insert([
       {
         appointment_date: selectedDate,
@@ -116,7 +119,8 @@ if (existingReservations && existingReservations.length > 0) {
         phone: phone.trim(),
         service,
         note: note.trim(),
-        status: "booked"
+        status: "booked",
+cancel_code: cancelCode
       }
     ]);
 
@@ -139,15 +143,55 @@ if (existingReservations && existingReservations.length > 0) {
         console.error("Napaka pri pošiljanju emaila:", err);
       }
 
-      setMessage("Termin je uspešno rezerviran.");
+      setMessage(`Termin je uspešno rezerviran. Koda za preklic: ${cancelCode}`);
       setSelectedTime("");
       setService("");
       setName("");
       setPhone("");
       setNote("");
       loadAppointments();
-    } else {
+      } else {
       setMessage("Ta termin je žal že zaseden.");
+    }
+  }
+
+  async function cancelReservation() {
+    setMessage("");
+
+    if (!selectedDate) {
+      setMessage("Izberi datum rezervacije.");
+      return;
+    }
+
+    if (!phone.trim()) {
+      setMessage("Vpiši telefonsko številko za preklic.");
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      setMessage("Vpiši pravilno telefonsko številko.");
+      return;
+    }
+
+    const confirmCancel = confirm(
+      `Ali res želiš preklicati termin za datum ${selectedDate} s telefonsko številko ${phone}?`
+    );
+
+    if (!confirmCancel) return;
+
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("appointment_date", selectedDate)
+      .eq("phone", phone.trim())
+      .eq("status", "booked");
+
+    if (!error) {
+      setMessage("Če je bil termin najden, je bil preklican.");
+      setPhone("");
+      loadAppointments();
+    } else {
+      setMessage("Napaka pri preklicu termina.");
     }
   }
 
@@ -272,6 +316,12 @@ if (existingReservations && existingReservations.length > 0) {
         <button onClick={reserve} style={mainButtonStyle}>
           Rezerviraj termin
         </button>
+        <button
+  onClick={cancelReservation}
+  style={{ ...secondaryButtonStyle, marginTop: "10px" }}
+>
+  Prekliči termin
+</button>
       </div>
     </div>
   );
