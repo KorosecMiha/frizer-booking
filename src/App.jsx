@@ -30,9 +30,7 @@ function generateCancelCode() {
 function isPastHour(selectedDate, hour) {
   const today = getToday();
 
-  if (selectedDate !== today) {
-    return false;
-  }
+  if (selectedDate !== today) return false;
 
   const now = new Date();
   const [hourPart, minutePart] = hour.split(":");
@@ -41,6 +39,30 @@ function isPastHour(selectedDate, hour) {
   appointmentTime.setHours(Number(hourPart), Number(minutePart), 0, 0);
 
   return appointmentTime <= now;
+}
+
+function formatDate(date) {
+  return date.toISOString().split("T")[0];
+}
+
+function getNextSevenDays() {
+  const days = [];
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+
+    days.push({
+      date: formatDate(date),
+      label: date.toLocaleDateString("sl-SI", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit"
+      })
+    });
+  }
+
+  return days;
 }
 
 function isValidName(value) {
@@ -244,16 +266,10 @@ function BookingPage() {
         />
 
         <label style={labelStyle}>Storitev</label>
-        <select
-          value={service}
-          onChange={(e) => setService(e.target.value)}
-          style={inputStyle}
-        >
+        <select value={service} onChange={(e) => setService(e.target.value)} style={inputStyle}>
           <option value="">Izberi storitev</option>
           {services.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
+            <option key={item} value={item}>{item}</option>
           ))}
         </select>
 
@@ -278,28 +294,14 @@ function BookingPage() {
                 }}
                 style={{
                   ...timeButtonStyle,
-                  background: unavailable
-                    ? "#d1d5db"
-                    : selected
-                    ? "#111827"
-                    : "#f3f4f6",
-                  color: unavailable
-                    ? "#6b7280"
-                    : selected
-                    ? "white"
-                    : "#111827",
+                  background: unavailable ? "#d1d5db" : selected ? "#111827" : "#f3f4f6",
+                  color: unavailable ? "#6b7280" : selected ? "white" : "#111827",
                   cursor: unavailable ? "not-allowed" : "pointer"
                 }}
               >
                 <strong>{hour}</strong>
                 <span style={{ fontSize: "12px" }}>
-                  {booked
-                    ? "Zasedeno"
-                    : blocked
-                    ? "Ni na voljo"
-                    : past
-                    ? "Preteklo"
-                    : "Prosto"}
+                  {booked ? "Zasedeno" : blocked ? "Ni na voljo" : past ? "Preteklo" : "Prosto"}
                 </span>
               </button>
             );
@@ -327,11 +329,7 @@ function BookingPage() {
           placeholder="npr. pridem 5 minut kasneje ..."
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          style={{
-            ...inputStyle,
-            minHeight: "80px",
-            resize: "vertical"
-          }}
+          style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
         />
 
         {selectedTime && (
@@ -374,10 +372,7 @@ function BookingPage() {
               style={inputStyle}
             />
 
-            <button
-              onClick={cancelReservation}
-              style={{ ...secondaryButtonStyle, marginTop: "10px" }}
-            >
+            <button onClick={cancelReservation} style={{ ...secondaryButtonStyle, marginTop: "10px" }}>
               Potrdi preklic
             </button>
           </div>
@@ -402,18 +397,13 @@ function AdminLogin() {
       data: { session }
     } = await supabase.auth.getSession();
 
-    if (session) {
-      setIsLoggedIn(true);
-    }
+    if (session) setIsLoggedIn(true);
   }
 
   async function login() {
     setMessage("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setMessage("Napačen email ali geslo.");
@@ -463,6 +453,7 @@ function AdminLogin() {
 
 function AdminPanel({ onLogout }) {
   const today = getToday();
+  const weekDays = getNextSevenDays();
 
   const [appointments, setAppointments] = useState([]);
   const [blockDate, setBlockDate] = useState(today);
@@ -484,13 +475,17 @@ function AdminPanel({ onLogout }) {
     loadAllAppointments();
   }, []);
 
+  function findAppointment(date, hour) {
+    return appointments.find(
+      (item) => item.appointment_date === date && item.appointment_time === hour
+    );
+  }
+
   async function blockAppointment() {
     setMessage("");
 
     const existing = appointments.find(
-      (a) =>
-        a.appointment_date === blockDate &&
-        a.appointment_time === blockTime
+      (a) => a.appointment_date === blockDate && a.appointment_time === blockTime
     );
 
     if (existing) {
@@ -530,13 +525,8 @@ function AdminPanel({ onLogout }) {
     ? appointments.filter((item) => item.appointment_date === filterDate)
     : appointments;
 
-  const bookedAppointments = visibleAppointments.filter(
-    (item) => item.status === "booked"
-  );
-
-  const blockedAppointments = visibleAppointments.filter(
-    (item) => item.status === "blocked"
-  );
+  const bookedAppointments = visibleAppointments.filter((item) => item.status === "booked");
+  const blockedAppointments = visibleAppointments.filter((item) => item.status === "blocked");
 
   const todaysAppointments = appointments.filter(
     (item) => item.appointment_date === today && item.status === "booked"
@@ -551,9 +541,53 @@ function AdminPanel({ onLogout }) {
             <h1 style={titleStyle}>Rezervacije</h1>
           </div>
 
-          <button onClick={onLogout} style={logoutButtonStyle}>
-            Odjava
-          </button>
+          <button onClick={onLogout} style={logoutButtonStyle}>Odjava</button>
+        </div>
+
+        <div style={blockBoxStyle}>
+          <h2 style={{ marginTop: 0 }}>Tedenski pregled</h2>
+
+          {weekDays.map((day) => (
+            <div key={day.date} style={weekDayBoxStyle}>
+              <h3 style={{ marginTop: 0, textTransform: "capitalize" }}>
+                {day.label}
+              </h3>
+
+              <div style={weekGridStyle}>
+                {hours.map((hour) => {
+                  const appointment = findAppointment(day.date, hour);
+                  const booked = appointment?.status === "booked";
+                  const blocked = appointment?.status === "blocked";
+
+                  return (
+                    <div
+                      key={`${day.date}-${hour}`}
+                      style={{
+                        ...weekSlotStyle,
+                        background: booked ? "#ecfdf5" : blocked ? "#fee2e2" : "#f3f4f6",
+                        borderColor: booked ? "#10b981" : blocked ? "#ef4444" : "#e5e7eb"
+                      }}
+                    >
+                      <strong>{hour}</strong>
+                      <div style={{ fontSize: "13px", marginTop: "4px" }}>
+                        {booked
+                          ? appointment.customer_name
+                          : blocked
+                          ? "Blokirano"
+                          : "Prosto"}
+                      </div>
+
+                      {booked && (
+                        <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px" }}>
+                          {appointment.service}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div style={blockBoxStyle}>
@@ -565,22 +599,10 @@ function AdminPanel({ onLogout }) {
             <div key={appointment.id} style={appointmentCardStyle}>
               <div>
                 <strong>{appointment.appointment_time}</strong>
-
-                <p style={{ margin: "6px 0" }}>
-                  <strong>{appointment.customer_name}</strong>
-                </p>
-
-                <p style={{ margin: "4px 0", color: "#374151" }}>
-                  Telefon: {appointment.phone}
-                </p>
-
-                <p style={{ margin: "4px 0", color: "#374151" }}>
-                  Storitev: {appointment.service || "-"}
-                </p>
-
-                <p style={{ margin: "4px 0", color: "#6b7280" }}>
-                  Opomba: {appointment.note || "-"}
-                </p>
+                <p style={{ margin: "6px 0" }}><strong>{appointment.customer_name}</strong></p>
+                <p style={{ margin: "4px 0", color: "#374151" }}>Telefon: {appointment.phone}</p>
+                <p style={{ margin: "4px 0", color: "#374151" }}>Storitev: {appointment.service || "-"}</p>
+                <p style={{ margin: "4px 0", color: "#6b7280" }}>Opomba: {appointment.note || "-"}</p>
               </div>
             </div>
           ))}
@@ -599,15 +621,9 @@ function AdminPanel({ onLogout }) {
           />
 
           <label style={labelStyle}>Ura</label>
-          <select
-            value={blockTime}
-            onChange={(e) => setBlockTime(e.target.value)}
-            style={inputStyle}
-          >
+          <select value={blockTime} onChange={(e) => setBlockTime(e.target.value)} style={inputStyle}>
             {hours.map((hour) => (
-              <option key={hour} value={hour}>
-                {hour}
-              </option>
+              <option key={hour} value={hour}>{hour}</option>
             ))}
           </select>
 
@@ -630,10 +646,7 @@ function AdminPanel({ onLogout }) {
           />
 
           {filterDate && (
-            <button
-              onClick={() => setFilterDate("")}
-              style={secondaryButtonStyle}
-            >
+            <button onClick={() => setFilterDate("")} style={secondaryButtonStyle}>
               Prikaži vse
             </button>
           )}
@@ -646,25 +659,11 @@ function AdminPanel({ onLogout }) {
         {bookedAppointments.map((appointment) => (
           <div key={appointment.id} style={appointmentCardStyle}>
             <div>
-              <strong>
-                {appointment.appointment_date} ob {appointment.appointment_time}
-              </strong>
-
-              <p style={{ margin: "6px 0" }}>
-                <strong>{appointment.customer_name}</strong>
-              </p>
-
-              <p style={{ margin: "4px 0", color: "#374151" }}>
-                Telefon: {appointment.phone}
-              </p>
-
-              <p style={{ margin: "4px 0", color: "#374151" }}>
-                Storitev: {appointment.service || "-"}
-              </p>
-
-              <p style={{ margin: "4px 0", color: "#6b7280" }}>
-                Opomba: {appointment.note || "-"}
-              </p>
+              <strong>{appointment.appointment_date} ob {appointment.appointment_time}</strong>
+              <p style={{ margin: "6px 0" }}><strong>{appointment.customer_name}</strong></p>
+              <p style={{ margin: "4px 0", color: "#374151" }}>Telefon: {appointment.phone}</p>
+              <p style={{ margin: "4px 0", color: "#374151" }}>Storitev: {appointment.service || "-"}</p>
+              <p style={{ margin: "4px 0", color: "#6b7280" }}>Opomba: {appointment.note || "-"}</p>
 
               {appointment.cancel_code && (
                 <p style={{ margin: "4px 0", color: "#6b7280" }}>
@@ -673,10 +672,7 @@ function AdminPanel({ onLogout }) {
               )}
             </div>
 
-            <button
-              onClick={() => deleteAppointment(appointment.id)}
-              style={deleteButtonStyle}
-            >
+            <button onClick={() => deleteAppointment(appointment.id)} style={deleteButtonStyle}>
               Izbriši
             </button>
           </div>
@@ -689,19 +685,13 @@ function AdminPanel({ onLogout }) {
         {blockedAppointments.map((appointment) => (
           <div key={appointment.id} style={appointmentCardStyle}>
             <div>
-              <strong>
-                {appointment.appointment_date} ob {appointment.appointment_time}
-              </strong>
-
+              <strong>{appointment.appointment_date} ob {appointment.appointment_time}</strong>
               <p style={{ margin: "6px 0", color: "#6b7280" }}>
                 Ni na voljo za stranke
               </p>
             </div>
 
-            <button
-              onClick={() => deleteAppointment(appointment.id)}
-              style={deleteButtonStyle}
-            >
+            <button onClick={() => deleteAppointment(appointment.id)} style={deleteButtonStyle}>
               Odblokiraj
             </button>
           </div>
@@ -729,7 +719,7 @@ const cardStyle = {
 };
 
 const adminCardStyle = {
-  maxWidth: "760px",
+  maxWidth: "980px",
   margin: "auto",
   background: "white",
   borderRadius: "24px",
@@ -887,4 +877,25 @@ const cancelBoxStyle = {
   borderRadius: "18px",
   background: "#f9fafb",
   border: "1px solid #e5e7eb"
+};
+
+const weekDayBoxStyle = {
+  marginTop: "18px",
+  padding: "16px",
+  borderRadius: "16px",
+  background: "white",
+  border: "1px solid #e5e7eb"
+};
+
+const weekGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+  gap: "10px"
+};
+
+const weekSlotStyle = {
+  padding: "10px",
+  borderRadius: "12px",
+  border: "1px solid #e5e7eb",
+  minHeight: "62px"
 };
