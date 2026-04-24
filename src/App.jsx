@@ -26,11 +26,11 @@ function getToday() {
 }
 
 function isValidName(value) {
-  return /^[A-Za-zČŠŽĆĐčšžćđ\s'-]{2,}$/.test(value.trim());
+  return /^[A-Za-zČŠŽĆĐčšžćđ'-]{2,}\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,}(\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,})*$/.test(value.trim());
 }
 
 function isValidPhone(value) {
-  return /^[0-9+\s/-]{6,20}$/.test(value.trim());
+  return /^[0-9]{6,15}$/.test(value.trim());
 }
 
 function BookingPage() {
@@ -76,20 +76,32 @@ function BookingPage() {
     }
 
     if (!isValidName(name)) {
-      setMessage("Ime mora vsebovati črke in biti dolgo vsaj 2 znaka.");
+      setMessage("Vpiši ime in priimek.");
       return;
     }
 
-    if (!isValidPhone(phone)) {
-      setMessage("Vpiši pravilno telefonsko številko.");
-      return;
-    }
-
+ if (phone.trim() !== "" && !isValidPhone(phone)) {
+  setMessage("Vpiši pravilno telefonsko številko.");
+  return;
+}
     const confirmReservation = confirm(
       `Potrdi rezervacijo:\n\n${selectedDate} ob ${selectedTime}\nStoritev: ${service}\nIme: ${name}\nTelefon: ${phone}`
     );
 
     if (!confirmReservation) return;
+  const normalizedName = name.trim();
+
+const { data: existingReservations } = await supabase
+  .from("appointments")
+  .select("id")
+  .eq("customer_name", normalizedName)
+  .eq("status", "booked")
+  .gte("appointment_date", today);
+
+if (existingReservations && existingReservations.length > 0) {
+  setMessage("S tem imenom že imate aktivno rezervacijo.");
+  return;
+}
 
     const { error } = await supabase.from("appointments").insert([
       {
@@ -219,12 +231,12 @@ function BookingPage() {
         />
 
         <label style={labelStyle}>Telefon</label>
-        <input
-          placeholder="npr. 040 123 456"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          style={inputStyle}
-        />
+       <input
+  placeholder="Telefonska številka (neobvezno)"
+  value={phone}
+  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+  style={inputStyle}
+/>
 
         <label style={labelStyle}>Opomba</label>
         <textarea
@@ -338,6 +350,7 @@ function AdminPanel({ onLogout }) {
       return;
     }
 
+  
     const { error } = await supabase.from("appointments").insert([
       {
         appointment_date: blockDate,
