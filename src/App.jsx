@@ -9,6 +9,13 @@ const hours = [
   "12:00", "13:00", "14:00", "15:00", "16:00"
 ];
 
+const services = [
+  "Moško striženje",
+  "Otroško striženje",
+  "Brada",
+  "Striženje + brada"
+];
+
 export default function App() {
   const isAdmin = window.location.pathname === "/admin";
   return isAdmin ? <AdminLogin /> : <BookingPage />;
@@ -18,14 +25,24 @@ function getToday() {
   return new Date().toISOString().split("T")[0];
 }
 
+function isValidName(value) {
+  return /^[A-Za-zČŠŽĆĐčšžćđ\s'-]{2,}$/.test(value.trim());
+}
+
+function isValidPhone(value) {
+  return /^[0-9+\s/-]{6,20}$/.test(value.trim());
+}
+
 function BookingPage() {
   const today = getToday();
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [appointments, setAppointments] = useState([]);
   const [selectedTime, setSelectedTime] = useState("");
+  const [service, setService] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
 
   async function loadAppointments() {
@@ -48,17 +65,40 @@ function BookingPage() {
   async function reserve() {
     setMessage("");
 
-    if (!selectedTime || !name || !phone) {
-      setMessage("Izpolni ime, telefon in izberi termin.");
+    if (!selectedTime) {
+      setMessage("Izberi prost termin.");
       return;
     }
+
+    if (!service) {
+      setMessage("Izberi storitev.");
+      return;
+    }
+
+    if (!isValidName(name)) {
+      setMessage("Ime mora vsebovati črke in biti dolgo vsaj 2 znaka.");
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      setMessage("Vpiši pravilno telefonsko številko.");
+      return;
+    }
+
+    const confirmReservation = confirm(
+      `Potrdi rezervacijo:\n\n${selectedDate} ob ${selectedTime}\nStoritev: ${service}\nIme: ${name}\nTelefon: ${phone}`
+    );
+
+    if (!confirmReservation) return;
 
     const { error } = await supabase.from("appointments").insert([
       {
         appointment_date: selectedDate,
         appointment_time: selectedTime,
-        customer_name: name,
-        phone: phone,
+        customer_name: name.trim(),
+        phone: phone.trim(),
+        service,
+        note: note.trim(),
         status: "booked"
       }
     ]);
@@ -72,20 +112,22 @@ function BookingPage() {
             customer_name: name,
             phone: phone,
             appointment_date: selectedDate,
-            appointment_time: selectedTime
+            appointment_time: selectedTime,
+            service: service,
+            note: note || "-"
           },
           "2hPd-4EsO_MkOniVS"
         );
-
-        console.log("Email poslan.");
       } catch (err) {
         console.error("Napaka pri pošiljanju emaila:", err);
       }
 
       setMessage("Termin je uspešno rezerviran.");
       setSelectedTime("");
+      setService("");
       setName("");
       setPhone("");
+      setNote("");
       loadAppointments();
     } else {
       setMessage("Ta termin je žal že zaseden.");
@@ -97,7 +139,7 @@ function BookingPage() {
       <div style={cardStyle}>
         <p style={smallText}>FRIZERSKI SALON</p>
         <h1 style={titleStyle}>Rezervacija termina</h1>
-        <p style={subtitleStyle}>Izberi datum, uro in vpiši svoje podatke.</p>
+        <p style={subtitleStyle}>Izberi datum, storitev, uro in vpiši podatke.</p>
 
         <label style={labelStyle}>Datum</label>
         <input
@@ -111,6 +153,20 @@ function BookingPage() {
           }}
           style={inputStyle}
         />
+
+        <label style={labelStyle}>Storitev</label>
+        <select
+          value={service}
+          onChange={(e) => setService(e.target.value)}
+          style={inputStyle}
+        >
+          <option value="">Izberi storitev</option>
+          {services.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
 
         <label style={labelStyle}>Prosti termini</label>
 
@@ -156,7 +212,7 @@ function BookingPage() {
 
         <label style={labelStyle}>Ime in priimek</label>
         <input
-          placeholder="npr. jože novak"
+          placeholder="npr. Jože Novak"
           value={name}
           onChange={(e) => setName(e.target.value)}
           style={inputStyle}
@@ -170,9 +226,27 @@ function BookingPage() {
           style={inputStyle}
         />
 
+        <label style={labelStyle}>Opomba</label>
+        <textarea
+          placeholder="pridem 5 minut kasneje al pa 15 :) ..."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          style={{
+            ...inputStyle,
+            minHeight: "80px",
+            resize: "vertical"
+          }}
+        />
+
         {selectedTime && (
           <div style={summaryStyle}>
             Izbran termin: <strong>{selectedDate} ob {selectedTime}</strong>
+            {service && (
+              <>
+                <br />
+                Storitev: <strong>{service}</strong>
+              </>
+            )}
           </div>
         )}
 
@@ -233,6 +307,7 @@ function AdminPanel({ onLogout }) {
   const [appointments, setAppointments] = useState([]);
   const [blockDate, setBlockDate] = useState(today);
   const [blockTime, setBlockTime] = useState("08:00");
+  const [filterDate, setFilterDate] = useState("");
   const [message, setMessage] = useState("");
 
   async function loadAllAppointments() {
@@ -269,6 +344,8 @@ function AdminPanel({ onLogout }) {
         appointment_time: blockTime,
         customer_name: "ADMIN BLOKADA",
         phone: "-",
+        service: "-",
+        note: "-",
         status: "blocked"
       }
     ]);
@@ -288,6 +365,18 @@ function AdminPanel({ onLogout }) {
     await supabase.from("appointments").delete().eq("id", id);
     loadAllAppointments();
   }
+
+  const visibleAppointments = filterDate
+    ? appointments.filter((item) => item.appointment_date === filterDate)
+    : appointments;
+
+  const bookedAppointments = visibleAppointments.filter(
+    (item) => item.status === "booked"
+  );
+
+  const blockedAppointments = visibleAppointments.filter(
+    (item) => item.status === "blocked"
+  );
 
   return (
     <div style={backgroundStyle}>
@@ -335,39 +424,88 @@ function AdminPanel({ onLogout }) {
           {message && <div style={messageStyle}>{message}</div>}
         </div>
 
-        <h2>Vsi termini</h2>
+        <div style={filterBoxStyle}>
+          <h2 style={{ marginTop: 0 }}>Pregled terminov</h2>
 
-        {appointments.length === 0 && <p>Ni rezervacij.</p>}
+          <label style={labelStyle}>Filtriraj po datumu</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            style={inputStyle}
+          />
 
-        {appointments.map((appointment) => {
-          const isBlocked = appointment.status === "blocked";
+          {filterDate && (
+            <button
+              onClick={() => setFilterDate("")}
+              style={secondaryButtonStyle}
+            >
+              Prikaži vse
+            </button>
+          )}
+        </div>
 
-          return (
-            <div key={appointment.id} style={appointmentCardStyle}>
-              <div>
-                <strong>
-                  {appointment.appointment_date} ob{" "}
-                  {appointment.appointment_time}
-                </strong>
+        <h2>Rezervacije</h2>
 
-                <p style={{ margin: "6px 0" }}>
-                  {isBlocked ? "Blokiran termin" : appointment.customer_name}
-                </p>
+        {bookedAppointments.length === 0 && <p>Ni rezervacij.</p>}
 
-                <p style={{ margin: 0, color: "#6b7280" }}>
-                  {isBlocked ? "Ni na voljo za stranke" : appointment.phone}
-                </p>
-              </div>
+        {bookedAppointments.map((appointment) => (
+          <div key={appointment.id} style={appointmentCardStyle}>
+            <div>
+              <strong>
+                {appointment.appointment_date} ob {appointment.appointment_time}
+              </strong>
 
-              <button
-                onClick={() => deleteAppointment(appointment.id)}
-                style={deleteButtonStyle}
-              >
-                {isBlocked ? "Odblokiraj" : "Izbriši"}
-              </button>
+              <p style={{ margin: "6px 0" }}>
+                <strong>{appointment.customer_name}</strong>
+              </p>
+
+              <p style={{ margin: "4px 0", color: "#374151" }}>
+                Telefon: {appointment.phone}
+              </p>
+
+              <p style={{ margin: "4px 0", color: "#374151" }}>
+                Storitev: {appointment.service || "-"}
+              </p>
+
+              <p style={{ margin: "4px 0", color: "#6b7280" }}>
+                Opomba: {appointment.note || "-"}
+              </p>
             </div>
-          );
-        })}
+
+            <button
+              onClick={() => deleteAppointment(appointment.id)}
+              style={deleteButtonStyle}
+            >
+              Izbriši
+            </button>
+          </div>
+        ))}
+
+        <h2>Blokirani termini</h2>
+
+        {blockedAppointments.length === 0 && <p>Ni blokiranih terminov.</p>}
+
+        {blockedAppointments.map((appointment) => (
+          <div key={appointment.id} style={appointmentCardStyle}>
+            <div>
+              <strong>
+                {appointment.appointment_date} ob {appointment.appointment_time}
+              </strong>
+
+              <p style={{ margin: "6px 0", color: "#6b7280" }}>
+                Ni na voljo za stranke
+              </p>
+            </div>
+
+            <button
+              onClick={() => deleteAppointment(appointment.id)}
+              style={deleteButtonStyle}
+            >
+              Odblokiraj
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -391,7 +529,7 @@ const cardStyle = {
 };
 
 const adminCardStyle = {
-  maxWidth: "720px",
+  maxWidth: "760px",
   margin: "auto",
   background: "white",
   borderRadius: "24px",
@@ -479,6 +617,17 @@ const mainButtonStyle = {
   fontWeight: "bold"
 };
 
+const secondaryButtonStyle = {
+  width: "100%",
+  padding: "12px",
+  background: "#374151",
+  color: "white",
+  border: "none",
+  borderRadius: "12px",
+  cursor: "pointer",
+  fontWeight: "bold"
+};
+
 const adminHeaderStyle = {
   display: "flex",
   justifyContent: "space-between",
@@ -499,6 +648,7 @@ const appointmentCardStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  gap: "15px",
   padding: "16px",
   marginTop: "12px",
   border: "1px solid #e5e7eb",
@@ -512,7 +662,8 @@ const deleteButtonStyle = {
   color: "white",
   border: "none",
   borderRadius: "10px",
-  cursor: "pointer"
+  cursor: "pointer",
+  whiteSpace: "nowrap"
 };
 
 const blockBoxStyle = {
@@ -520,4 +671,12 @@ const blockBoxStyle = {
   padding: "18px",
   borderRadius: "18px",
   background: "#f3f4f6"
+};
+
+const filterBoxStyle = {
+  marginTop: "20px",
+  padding: "18px",
+  borderRadius: "18px",
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb"
 };
