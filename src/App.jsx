@@ -22,12 +22,12 @@ export default function App() {
 }
 
 function getToday() {
-  function generateCancelCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
   return new Date().toISOString().split("T")[0];
 }
 
+function generateCancelCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 function isValidName(value) {
   return /^[A-Za-zČŠŽĆĐčšžćđ'-]{2,}\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,}(\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,})*$/.test(value.trim());
 }
@@ -46,7 +46,8 @@ function BookingPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [message, setMessage] = useState("");
+const [cancelCode, setCancelCode] = useState("");
+const [message, setMessage] = useState("");
 
   async function loadAppointments() {
     const { data } = await supabase
@@ -172,7 +173,10 @@ cancel_code: cancelCode
       setMessage("Vpiši pravilno telefonsko številko.");
       return;
     }
-
+if (!cancelCode.trim()) {
+  setMessage("Vpiši kodo za preklic.");
+  return;
+}
     const confirmCancel = confirm(
       `Ali res želiš preklicati termin za datum ${selectedDate} s telefonsko številko ${phone}?`
     );
@@ -184,7 +188,8 @@ cancel_code: cancelCode
       .delete()
       .eq("appointment_date", selectedDate)
       .eq("phone", phone.trim())
-      .eq("status", "booked");
+.eq("cancel_code", cancelCode.trim())
+.eq("status", "booked");
 
     if (!error) {
       setMessage("Če je bil termin najden, je bil preklican.");
@@ -271,33 +276,34 @@ cancel_code: cancelCode
           })}
         </div>
 
-        <label style={labelStyle}>Ime in priimek</label>
-        <input
-          placeholder="npr. Jože Novak"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={inputStyle}
-        />
-
-        <label style={labelStyle}>Telefon</label>
-       <input
+   <label style={labelStyle}>Telefon</label>
+<input
   placeholder="Telefonska številka"
   value={phone}
   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
   style={inputStyle}
 />
 
-        <label style={labelStyle}>Opomba</label>
-        <textarea
-          placeholder="pridem 5 minut kasneje al pa 15 :) ..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          style={{
-            ...inputStyle,
-            minHeight: "80px",
-            resize: "vertical"
-          }}
-        />
+<label style={labelStyle}>Koda za preklic</label>
+<input
+  placeholder="Vnesi 6-mestno kodo"
+  value={cancelCode}
+  onChange={(e) => setCancelCode(e.target.value.replace(/\D/g, ""))}
+  style={inputStyle}
+/>
+
+<label style={labelStyle}>Opomba</label>
+<textarea
+  placeholder="pridem 5 minut kasneje al pa 15 :) ..."
+  value={note}
+  onChange={(e) => setNote(e.target.value)}
+  style={{
+    ...inputStyle,
+    minHeight: "80px",
+    resize: "vertical"
+  }}
+/>
+         
 
         {selectedTime && (
           <div style={summaryStyle}>
