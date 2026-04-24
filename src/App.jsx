@@ -80,7 +80,12 @@ function BookingPage() {
       return;
     }
 
- if (phone.trim() !== "" && !isValidPhone(phone)) {
+ if (!phone.trim()) {
+  setMessage("Vpiši telefonsko številko.");
+  return;
+}
+
+if (!isValidPhone(phone)) {
   setMessage("Vpiši pravilno telefonsko številko.");
   return;
 }
@@ -232,7 +237,7 @@ if (existingReservations && existingReservations.length > 0) {
 
         <label style={labelStyle}>Telefon</label>
        <input
-  placeholder="Telefonska številka (neobvezno)"
+  placeholder="Telefonska številka"
   value={phone}
   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
   style={inputStyle}
