@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 
-const ADMIN_PASSWORD = "1234";
+const ADMIN_PASSWORD = "samnafuzbalmepust";
 
 const hours = [
   "08:00", "09:00", "10:00", "11:00",
@@ -137,7 +137,7 @@ function BookingPage() {
 
         <label style={labelStyle}>Ime in priimek</label>
         <input
-          placeholder="npr. Miha Korošec"
+          placeholder="npr. jože novak"
           value={name}
           onChange={(e) => setName(e.target.value)}
           style={inputStyle}
