@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import emailjs from "@emailjs/browser";
 
-
-
 const hours = [
   "08:00", "09:00", "10:00", "11:00",
   "12:00", "13:00", "14:00", "15:00", "16:00"
@@ -28,6 +26,7 @@ function getToday() {
 function generateCancelCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
 function isValidName(value) {
   return /^[A-Za-zČŠŽĆĐčšžćđ'-]{2,}\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,}(\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,})*$/.test(value.trim());
 }
@@ -46,8 +45,8 @@ function BookingPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-const [cancelCode, setCancelCode] = useState("");
-const [message, setMessage] = useState("");
+  const [cancelCode, setCancelCode] = useState("");
+  const [message, setMessage] = useState("");
 
   async function loadAppointments() {
     const { data } = await supabase
@@ -84,34 +83,36 @@ const [message, setMessage] = useState("");
       return;
     }
 
- if (!phone.trim()) {
-  setMessage("Vpiši telefonsko številko.");
-  return;
-}
+    if (!phone.trim()) {
+      setMessage("Vpiši telefonsko številko.");
+      return;
+    }
 
-if (!isValidPhone(phone)) {
-  setMessage("Vpiši pravilno telefonsko številko.");
-  return;
-}
+    if (!isValidPhone(phone)) {
+      setMessage("Vpiši pravilno telefonsko številko.");
+      return;
+    }
+
     const confirmReservation = confirm(
       `Potrdi rezervacijo:\n\n${selectedDate} ob ${selectedTime}\nStoritev: ${service}\nIme: ${name}\nTelefon: ${phone}`
     );
 
     if (!confirmReservation) return;
-  const normalizedName = name.trim();
 
-const { data: existingReservations } = await supabase
-  .from("appointments")
-  .select("id")
-  .eq("phone", phone.trim())
-  .eq("status", "booked")
-  .gte("appointment_date", today);
+    const { data: existingReservations } = await supabase
+      .from("appointments")
+      .select("id")
+      .eq("phone", phone.trim())
+      .eq("status", "booked")
+      .gte("appointment_date", today);
 
-if (existingReservations && existingReservations.length > 0) {
-  setMessage("S to telefonsko številko že imate aktivno rezervacijo.");
-  return;
-}
-const cancelCode = generateCancelCode();
+    if (existingReservations && existingReservations.length > 0) {
+      setMessage("S to telefonsko številko že imate aktivno rezervacijo.");
+      return;
+    }
+
+    const newCancelCode = generateCancelCode();
+
     const { error } = await supabase.from("appointments").insert([
       {
         appointment_date: selectedDate,
@@ -121,7 +122,7 @@ const cancelCode = generateCancelCode();
         service,
         note: note.trim(),
         status: "booked",
-cancel_code: cancelCode
+        cancel_code: newCancelCode
       }
     ]);
 
@@ -136,7 +137,8 @@ cancel_code: cancelCode
             appointment_date: selectedDate,
             appointment_time: selectedTime,
             service: service,
-            note: note || "-"
+            note: note || "-",
+            cancel_code: newCancelCode
           },
           "2hPd-4EsO_MkOniVS"
         );
@@ -144,14 +146,15 @@ cancel_code: cancelCode
         console.error("Napaka pri pošiljanju emaila:", err);
       }
 
-      setMessage(`Termin je uspešno rezerviran. Koda za preklic: ${cancelCode}`);
+      setMessage(`Termin je uspešno rezerviran. Koda za preklic: ${newCancelCode}`);
       setSelectedTime("");
       setService("");
       setName("");
       setPhone("");
       setNote("");
+      setCancelCode("");
       loadAppointments();
-      } else {
+    } else {
       setMessage("Ta termin je žal že zaseden.");
     }
   }
@@ -173,10 +176,12 @@ cancel_code: cancelCode
       setMessage("Vpiši pravilno telefonsko številko.");
       return;
     }
-if (!cancelCode.trim()) {
-  setMessage("Vpiši kodo za preklic.");
-  return;
-}
+
+    if (!cancelCode.trim()) {
+      setMessage("Vpiši kodo za preklic.");
+      return;
+    }
+
     const confirmCancel = confirm(
       `Ali res želiš preklicati termin za datum ${selectedDate} s telefonsko številko ${phone}?`
     );
@@ -188,12 +193,13 @@ if (!cancelCode.trim()) {
       .delete()
       .eq("appointment_date", selectedDate)
       .eq("phone", phone.trim())
-.eq("cancel_code", cancelCode.trim())
-.eq("status", "booked");
+      .eq("cancel_code", cancelCode.trim())
+      .eq("status", "booked");
 
     if (!error) {
-      setMessage("Če je bil termin najden, je bil preklican.");
+      setMessage("Če je bil termin najden in je bila koda pravilna, je bil preklican.");
       setPhone("");
+      setCancelCode("");
       loadAppointments();
     } else {
       setMessage("Napaka pri preklicu termina.");
@@ -275,41 +281,34 @@ if (!cancelCode.trim()) {
             );
           })}
         </div>
-<label style={labelStyle}>Ime in priimek</label>
-<input
-  placeholder="npr. Jože Novak"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  style={inputStyle}
-/>
-   <label style={labelStyle}>Telefon</label>
-<input
-  placeholder="Telefonska številka"
-  value={phone}
-  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-  style={inputStyle}
-/>
 
-<label style={labelStyle}>Koda za preklic</label>
-<input
-  placeholder="Vnesi 6-mestno kodo"
-  value={cancelCode}
-  onChange={(e) => setCancelCode(e.target.value.replace(/\D/g, ""))}
-  style={inputStyle}
-/>
+        <label style={labelStyle}>Ime in priimek</label>
+        <input
+          placeholder="npr. Jože Novak"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={inputStyle}
+        />
 
-<label style={labelStyle}>Opomba</label>
-<textarea
-  placeholder="pridem 5 minut kasneje al pa 15 :) ..."
-  value={note}
-  onChange={(e) => setNote(e.target.value)}
-  style={{
-    ...inputStyle,
-    minHeight: "80px",
-    resize: "vertical"
-  }}
-/>
-         
+        <label style={labelStyle}>Telefon</label>
+        <input
+          placeholder="Telefonska številka"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+          style={inputStyle}
+        />
+
+        <label style={labelStyle}>Opomba</label>
+        <textarea
+          placeholder="npr. pridem 5 minut kasneje ..."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          style={{
+            ...inputStyle,
+            minHeight: "80px",
+            resize: "vertical"
+          }}
+        />
 
         {selectedTime && (
           <div style={summaryStyle}>
@@ -328,12 +327,28 @@ if (!cancelCode.trim()) {
         <button onClick={reserve} style={mainButtonStyle}>
           Rezerviraj termin
         </button>
-        <button
-  onClick={cancelReservation}
-  style={{ ...secondaryButtonStyle, marginTop: "10px" }}
->
-  Prekliči termin
-</button>
+
+        <div style={cancelBoxStyle}>
+          <h2 style={{ marginTop: 0, fontSize: "20px" }}>Preklic termina</h2>
+          <p style={{ color: "#6b7280", marginTop: 0 }}>
+            Za preklic vpiši datum, telefonsko številko in kodo za preklic.
+          </p>
+
+          <label style={labelStyle}>Koda za preklic</label>
+          <input
+            placeholder="Vnesi 6-mestno kodo"
+            value={cancelCode}
+            onChange={(e) => setCancelCode(e.target.value.replace(/\D/g, ""))}
+            style={inputStyle}
+          />
+
+          <button
+            onClick={cancelReservation}
+            style={{ ...secondaryButtonStyle, marginTop: "10px" }}
+          >
+            Prekliči termin
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -450,7 +465,6 @@ function AdminPanel({ onLogout }) {
       return;
     }
 
-  
     const { error } = await supabase.from("appointments").insert([
       {
         appointment_date: blockDate,
@@ -492,8 +506,8 @@ function AdminPanel({ onLogout }) {
   );
 
   const todaysAppointments = appointments.filter(
-  (item) => item.appointment_date === today && item.status === "booked"
-);
+    (item) => item.appointment_date === today && item.status === "booked"
+  );
 
   return (
     <div style={backgroundStyle}>
@@ -508,7 +522,8 @@ function AdminPanel({ onLogout }) {
             Odjava
           </button>
         </div>
-                  <div style={blockBoxStyle}>
+
+        <div style={blockBoxStyle}>
           <h2 style={{ marginTop: 0 }}>Današnji termini</h2>
 
           {todaysAppointments.length === 0 && <p>Danes ni rezervacij.</p>}
@@ -537,6 +552,7 @@ function AdminPanel({ onLogout }) {
             </div>
           ))}
         </div>
+
         <div style={blockBoxStyle}>
           <h2 style={{ marginTop: 0 }}>Blokiraj termin</h2>
 
@@ -616,6 +632,12 @@ function AdminPanel({ onLogout }) {
               <p style={{ margin: "4px 0", color: "#6b7280" }}>
                 Opomba: {appointment.note || "-"}
               </p>
+
+              {appointment.cancel_code && (
+                <p style={{ margin: "4px 0", color: "#6b7280" }}>
+                  Koda za preklic: {appointment.cancel_code}
+                </p>
+              )}
             </div>
 
             <button
@@ -820,6 +842,14 @@ const blockBoxStyle = {
 
 const filterBoxStyle = {
   marginTop: "20px",
+  padding: "18px",
+  borderRadius: "18px",
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb"
+};
+
+const cancelBoxStyle = {
+  marginTop: "22px",
   padding: "18px",
   borderRadius: "18px",
   background: "#f9fafb",
