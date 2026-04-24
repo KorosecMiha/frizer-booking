@@ -275,7 +275,13 @@ if (!cancelCode.trim()) {
             );
           })}
         </div>
-
+<label style={labelStyle}>Ime in priimek</label>
+<input
+  placeholder="npr. Jože Novak"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  style={inputStyle}
+/>
    <label style={labelStyle}>Telefon</label>
 <input
   placeholder="Telefonska številka"
