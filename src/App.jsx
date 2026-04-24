@@ -27,6 +27,22 @@ function generateCancelCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function isPastHour(selectedDate, hour) {
+  const today = getToday();
+
+  if (selectedDate !== today) {
+    return false;
+  }
+
+  const now = new Date();
+  const [hourPart, minutePart] = hour.split(":");
+
+  const appointmentTime = new Date();
+  appointmentTime.setHours(Number(hourPart), Number(minutePart), 0, 0);
+
+  return appointmentTime <= now;
+}
+
 function isValidName(value) {
   return /^[A-Za-zČŠŽĆĐčšžćđ'-]{2,}\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,}(\s+[A-Za-zČŠŽĆĐčšžćđ'-]{2,})*$/.test(value.trim());
 }
@@ -46,6 +62,7 @@ function BookingPage() {
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [cancelCode, setCancelCode] = useState("");
+  const [showCancelForm, setShowCancelForm] = useState(false);
   const [message, setMessage] = useState("");
 
   async function loadAppointments() {
@@ -247,7 +264,8 @@ function BookingPage() {
             const appointment = getAppointment(hour);
             const blocked = appointment?.status === "blocked";
             const booked = appointment?.status === "booked";
-            const unavailable = booked || blocked;
+            const past = isPastHour(selectedDate, hour);
+            const unavailable = booked || blocked || past;
             const selected = selectedTime === hour;
 
             return (
@@ -275,7 +293,13 @@ function BookingPage() {
               >
                 <strong>{hour}</strong>
                 <span style={{ fontSize: "12px" }}>
-                  {booked ? "Zasedeno" : blocked ? "Ni na voljo" : "Prosto"}
+                  {booked
+                    ? "Zasedeno"
+                    : blocked
+                    ? "Ni na voljo"
+                    : past
+                    ? "Preteklo"
+                    : "Prosto"}
                 </span>
               </button>
             );
@@ -328,27 +352,36 @@ function BookingPage() {
           Rezerviraj termin
         </button>
 
-        <div style={cancelBoxStyle}>
-          <h2 style={{ marginTop: 0, fontSize: "20px" }}>Preklic termina</h2>
-          <p style={{ color: "#6b7280", marginTop: 0 }}>
-            Za preklic vpiši datum, telefonsko številko in kodo za preklic.
-          </p>
+        <button
+          onClick={() => setShowCancelForm(!showCancelForm)}
+          style={{ ...secondaryButtonStyle, marginTop: "10px" }}
+        >
+          {showCancelForm ? "Skrij preklic termina" : "Prekliči termin"}
+        </button>
 
-          <label style={labelStyle}>Koda za preklic</label>
-          <input
-            placeholder="Vnesi 6-mestno kodo"
-            value={cancelCode}
-            onChange={(e) => setCancelCode(e.target.value.replace(/\D/g, ""))}
-            style={inputStyle}
-          />
+        {showCancelForm && (
+          <div style={cancelBoxStyle}>
+            <h2 style={{ marginTop: 0, fontSize: "20px" }}>Preklic termina</h2>
+            <p style={{ color: "#6b7280", marginTop: 0 }}>
+              Za preklic izberi datum ter vpiši telefonsko številko in kodo za preklic.
+            </p>
 
-          <button
-            onClick={cancelReservation}
-            style={{ ...secondaryButtonStyle, marginTop: "10px" }}
-          >
-            Prekliči termin
-          </button>
-        </div>
+            <label style={labelStyle}>Koda za preklic</label>
+            <input
+              placeholder="Vnesi 6-mestno kodo"
+              value={cancelCode}
+              onChange={(e) => setCancelCode(e.target.value.replace(/\D/g, ""))}
+              style={inputStyle}
+            />
+
+            <button
+              onClick={cancelReservation}
+              style={{ ...secondaryButtonStyle, marginTop: "10px" }}
+            >
+              Potrdi preklic
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
