@@ -273,22 +273,43 @@ if (existingReservations && existingReservations.length > 0) {
 }
 
 function AdminLogin() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    localStorage.getItem("adminLoggedIn") === "true"
-  );
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [message, setMessage] = useState("");
 
-  function login() {
-    if (password === ADMIN_PASSWORD) {
-      localStorage.setItem("adminLoggedIn", "true");
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+  async function checkUser() {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (session) {
       setIsLoggedIn(true);
-    } else {
-      alert("Napačno geslo.");
     }
   }
 
-  function logout() {
-    localStorage.removeItem("adminLoggedIn");
+  async function login() {
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      setMessage("Napačen email ali geslo.");
+      return;
+    }
+
+    setIsLoggedIn(true);
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
     setIsLoggedIn(false);
   }
 
@@ -298,6 +319,15 @@ function AdminLogin() {
     <div style={backgroundStyle}>
       <div style={cardStyle}>
         <h1 style={titleStyle}>Admin prijava</h1>
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={inputStyle}
+        />
+
         <input
           type="password"
           placeholder="Geslo"
@@ -305,6 +335,9 @@ function AdminLogin() {
           onChange={(e) => setPassword(e.target.value)}
           style={inputStyle}
         />
+
+        {message && <div style={messageStyle}>{message}</div>}
+
         <button onClick={login} style={mainButtonStyle}>
           Prijava
         </button>
