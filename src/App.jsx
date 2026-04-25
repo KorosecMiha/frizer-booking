@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import emailjs from "@emailjs/browser";
+import "./App.css";
 
 const hours = [
   "08:00", "09:00", "10:00", "11:00",
@@ -21,12 +22,17 @@ export default function App() {
 
 function getToday() {
   const date = new Date();
+  return formatDate(date);
+}
+
+function formatDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
+
 function generateCancelCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -45,13 +51,6 @@ function isPastHour(selectedDate, hour) {
   return appointmentTime <= now;
 }
 
-function formatDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
 function getNextSevenDays() {
   const days = [];
 
@@ -114,30 +113,11 @@ function BookingPage() {
   async function reserve() {
     setMessage("");
 
-    if (!selectedTime) {
-      setMessage("Izberi prost termin.");
-      return;
-    }
-
-    if (!service) {
-      setMessage("Izberi storitev.");
-      return;
-    }
-
-    if (!isValidName(name)) {
-      setMessage("Vpiši ime in priimek.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      setMessage("Vpiši telefonsko številko.");
-      return;
-    }
-
-    if (!isValidPhone(phone)) {
-      setMessage("Vpiši pravilno telefonsko številko.");
-      return;
-    }
+    if (!selectedTime) return setMessage("Izberi prost termin.");
+    if (!service) return setMessage("Izberi storitev.");
+    if (!isValidName(name)) return setMessage("Vpiši ime in priimek.");
+    if (!phone.trim()) return setMessage("Vpiši telefonsko številko.");
+    if (!isValidPhone(phone)) return setMessage("Vpiši pravilno telefonsko številko.");
 
     const confirmReservation = confirm(
       `Potrdi rezervacijo:\n\n${selectedDate} ob ${selectedTime}\nStoritev: ${service}\nIme: ${name}\nTelefon: ${phone}`
@@ -179,10 +159,10 @@ function BookingPage() {
           "template_bogoccg",
           {
             customer_name: name,
-            phone: phone,
+            phone,
             appointment_date: selectedDate,
             appointment_time: selectedTime,
-            service: service,
+            service,
             note: note || "-",
             cancel_code: newCancelCode
           },
@@ -208,25 +188,10 @@ function BookingPage() {
   async function cancelReservation() {
     setMessage("");
 
-    if (!selectedDate) {
-      setMessage("Izberi datum rezervacije.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      setMessage("Vpiši telefonsko številko za preklic.");
-      return;
-    }
-
-    if (!isValidPhone(phone)) {
-      setMessage("Vpiši pravilno telefonsko številko.");
-      return;
-    }
-
-    if (!cancelCode.trim()) {
-      setMessage("Vpiši kodo za preklic.");
-      return;
-    }
+    if (!selectedDate) return setMessage("Izberi datum rezervacije.");
+    if (!phone.trim()) return setMessage("Vpiši telefonsko številko za preklic.");
+    if (!isValidPhone(phone)) return setMessage("Vpiši pravilno telefonsko številko.");
+    if (!cancelCode.trim()) return setMessage("Vpiši kodo za preklic.");
 
     const confirmCancel = confirm(
       `Ali res želiš preklicati termin za datum ${selectedDate} s telefonsko številko ${phone}?`
@@ -488,6 +453,77 @@ function AdminPanel({ onLogout }) {
     );
   }
 
+  async function handleSlotClick(date, hour) {
+    setMessage("");
+
+    const existing = findAppointment(date, hour);
+
+    if (!existing) {
+      const confirmBlock = confirm(`Blokiram termin ${date} ob ${hour}?`);
+      if (!confirmBlock) return;
+
+      const { error } = await supabase.from("appointments").insert([
+        {
+          appointment_date: date,
+          appointment_time: hour,
+          customer_name: "ADMIN BLOKADA",
+          phone: "-",
+          service: "-",
+          note: "-",
+          status: "blocked"
+        }
+      ]);
+
+      if (!error) {
+        setMessage("Termin je blokiran.");
+        loadAllAppointments();
+      } else {
+        setMessage("Napaka pri blokiranju termina.");
+      }
+
+      return;
+    }
+
+    if (existing.status === "blocked") {
+      const confirmUnblock = confirm(`Odblokiram termin ${date} ob ${hour}?`);
+      if (!confirmUnblock) return;
+
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", existing.id);
+
+      if (!error) {
+        setMessage("Termin je odblokiran.");
+        loadAllAppointments();
+      } else {
+        setMessage("Napaka pri odblokiranju termina.");
+      }
+
+      return;
+    }
+
+    if (existing.status === "booked") {
+      const confirmDelete = confirm(
+        `Rezervacija:\n\n${existing.customer_name}\n${existing.phone}\n${existing.service}\n${date} ob ${hour}\n\nŽeliš izbrisati rezervacijo?`
+      );
+
+      if (!confirmDelete) return;
+
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", existing.id);
+
+      if (!error) {
+        setMessage("Rezervacija je izbrisana.");
+        loadAllAppointments();
+      } else {
+        setMessage("Napaka pri brisanju rezervacije.");
+      }
+    }
+  }
+
   async function blockAppointment() {
     setMessage("");
 
@@ -553,6 +589,9 @@ function AdminPanel({ onLogout }) {
 
         <div style={blockBoxStyle}>
           <h2 style={{ marginTop: 0 }}>Tedenski pregled</h2>
+          <p style={{ color: "#6b7280", marginTop: 0 }}>
+            Klikni na okvirček: prost termin se blokira, blokiran termin se odblokira, rezerviran termin se lahko izbriše.
+          </p>
 
           {weekDays.map((day) => (
             <div key={day.date} style={weekDayBoxStyle}>
@@ -569,13 +608,17 @@ function AdminPanel({ onLogout }) {
                   return (
                     <div
                       key={`${day.date}-${hour}`}
+                      onClick={() => handleSlotClick(day.date, hour)}
                       style={{
                         ...weekSlotStyle,
                         background: booked ? "#ecfdf5" : blocked ? "#fee2e2" : "#f3f4f6",
-                        borderColor: booked ? "#10b981" : blocked ? "#ef4444" : "#e5e7eb"
+                        borderColor: booked ? "#10b981" : blocked ? "#ef4444" : "#e5e7eb",
+                        cursor: "pointer",
+                        transition: "0.2s ease"
                       }}
                     >
                       <strong>{hour}</strong>
+
                       <div style={{ fontSize: "13px", marginTop: "4px" }}>
                         {booked
                           ? appointment.customer_name
@@ -589,6 +632,10 @@ function AdminPanel({ onLogout }) {
                           {appointment.service}
                         </div>
                       )}
+
+                      <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "5px" }}>
+                        Klik za urejanje
+                      </div>
                     </div>
                   );
                 })}
@@ -904,5 +951,5 @@ const weekSlotStyle = {
   padding: "10px",
   borderRadius: "12px",
   border: "1px solid #e5e7eb",
-  minHeight: "62px"
+  minHeight: "78px"
 };
